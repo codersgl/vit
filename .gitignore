@@ -9,6 +9,6 @@ wheels/
 # Virtual environments
 .venv
 runs/
-data/
+/data/
 checkpoint_dir/
 .github/
