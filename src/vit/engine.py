@@ -87,8 +87,8 @@ class EarlyStopping:
         self.val_loss_min = torch.inf
         self.delta = delta
         self.path = Path(path)
-        if not self.path.exists:
-            self.path.mkdir(parents=True, exist_ok=True)
+        if not self.path.exists():
+            self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def __call__(self, val_loss, model):
         score = -val_loss
