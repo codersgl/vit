@@ -164,6 +164,7 @@ def main(cfg: DictConfig):
         )
 
     loss_fn = nn.CrossEntropyLoss(label_smoothing=0.1)
+
     early_stopping = EarlyStopping(
         patience=cfg.training.patience,
         verbose=True,

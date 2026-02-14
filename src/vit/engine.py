@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -84,7 +86,9 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = torch.inf
         self.delta = delta
-        self.path = path
+        self.path = Path(path)
+        if not self.path.exists:
+            self.path.mkdir(parents=True, exist_ok=True)
 
     def __call__(self, val_loss, model):
         score = -val_loss
