@@ -1,10 +1,12 @@
-import argparse
 import random
+from typing import Tuple
 
+import hydra
 import numpy as np
 import torch
-import torch.optim as optim
 import torch.nn as nn
+import torch.optim as optim
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -22,105 +24,154 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="VIT",
-        epilog="train.py --batch_size 8",
-    )
+def get_dataloader(cfg: DictConfig) -> Tuple[DataLoader, DataLoader]:
+    try:
+        if cfg.data.name == "CIFAR100":
+            train_dataset = CIFAR100ForViT(
+                train=True,
+                transform=get_train_transform(
+                    mean=cfg.data.normalize_mean, std=cfg.data.normalize_std
+                ),
+            )
+            valid_dataset = CIFAR100ForViT(
+                train=False,
+                transform=get_val_transform(
+                    mean=cfg.data.normalize_mean, std=cfg.data.normalize_std
+                ),
+            )
 
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--embed_dim", type=int, default=768)
-    parser.add_argument("--num_heads", type=int, default=12)
-    parser.add_argument("--image_size", type=int, default=32)
-    parser.add_argument("--patch_size", type=int, default=4)
-    parser.add_argument("--in_channels", type=int, default=3)
-    parser.add_argument("--num_classes", type=int, default=100)
+        else:
+            raise ValueError(f"Unsupported dataset: {cfg.data.name}")
 
-    parser.add_argument("--num_blocks", type=int, default=12)
-    parser.add_argument("--log_dir", type=str, default="runs/transformer")
-    parser.add_argument("--checkpoint_dir", type=str, default="checkpoint_dir")
-    parser.add_argument(
-        "--ffn_dim", type=int, default=3072, help="The hidden dims in FeedForwordNet"
-    )
-    parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--beta1", type=float, default=0.9)
-    parser.add_argument("--beta2", type=float, default=0.98)
-    parser.add_argument("--weight_decay", type=float, default=0.01)
-    parser.add_argument("--max_grad_norm", type=float, default=1.0)
-    parser.add_argument("--patience", type=int, default=5)
+        train_dataloader = DataLoader(
+            train_dataset,
+            batch_size=cfg.data.batch_size,
+            shuffle=True,
+            num_workers=cfg.data.num_workers,
+            pin_memory=True if torch.cuda.is_available() else False,
+            drop_last=True,
+        )
 
-    args = parser.parse_args()
+        valid_dataloader = DataLoader(
+            valid_dataset,
+            batch_size=cfg.data.batch_size,
+            shuffle=False,
+            num_workers=cfg.data.num_workers,
+            pin_memory=True if torch.cuda.is_available() else False,
+            drop_last=False,
+        )
 
-    set_seed(args.seed)
+        return train_dataloader, valid_dataloader
+
+    except ImportError as e:
+        raise ImportError(f"Required module not found: {e}")
+    except AttributeError as e:
+        raise AttributeError(f"Missing configuration attribute: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to create dataloader for {cfg.data.name}: {e}")
+
+
+def get_optimizer(model: nn.Module, cfg: DictConfig) -> torch.optim.Optimizer:
+    try:
+        if cfg.optimizer.type == "Adam":
+            optimizer = optim.Adam(
+                model.parameters(),
+                lr=cfg.optimizer.lr,
+                betas=cfg.optimizer.betas,
+                weight_decay=cfg.optimizer.weight_decay,
+            )
+        elif cfg.optimizer.type == "AdamW":
+            optimizer = optim.AdamW(
+                model.parameters(),
+                lr=cfg.optimizer.lr,
+                betas=cfg.optimizer.betas,
+                weight_decay=cfg.optimizer.weight_decay,
+            )
+        else:
+            raise ValueError(f"Unsupported optimizer: {cfg.optimizer.type}")
+        return optimizer
+
+    except ImportError as e:
+        raise ImportError(f"Required module not found: {e}")
+    except AttributeError as e:
+        raise AttributeError(f"Missing configuration attribute: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to create optimizer for {cfg.optimizer.type}: {e}")
+
+
+def get_model(cfg: DictConfig) -> nn.Module:
+    try:
+        if cfg.model.name.startswith("vit"):
+            return VisionTransformer(
+                num_blocks=cfg.model.num_blocks,
+                image_size=cfg.model.image_size,
+                patch_size=cfg.model.patch_size,
+                in_channels=cfg.model.in_channels,
+                embed_dim=cfg.model.embed_dim,
+                ffn_dim=cfg.model.ffn_dim,
+                num_heads=cfg.model.num_heads,
+                num_classes=cfg.model.num_classes,
+                dropout=cfg.model.dropout,
+            )
+        else:
+            raise ValueError(f"Unsupported model: {cfg.model.name}")
+
+    except ImportError as e:
+        raise ImportError(f"Required module not found: {e}")
+    except AttributeError as e:
+        raise AttributeError(f"Missing configuration attribute: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to create model for {cfg.model.name}: {e}")
+
+
+@hydra.main(version_base=None, config_path="../config/", config_name="config")
+def main(cfg: DictConfig):
+    print(OmegaConf.to_yaml(cfg))
+    set_seed(cfg.training.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print(f"Using device: {device}")
-    print(args)
 
-    train_dataset = CIFAR100ForViT(train=True, transform=get_train_transform())
-    valid_dataset = CIFAR100ForViT(train=False, transform=get_val_transform())
-
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=args.num_workers,
-    )
-    valid_dataloader = DataLoader(
-        valid_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=args.num_workers,
-    )
-
-    model = VisionTransformer(
-        num_blocks=args.num_blocks,
-        image_size=args.image_size,
-        patch_size=args.patch_size,
-        in_channels=args.in_channels,
-        embed_dim=args.embed_dim,
-        ffn_dim=args.ffn_dim,
-        num_heads=args.num_heads,
-        num_classes=args.num_classes,
-        dropout=args.dropout,
-    )
+    train_dataloader, valid_dataloader = get_dataloader(cfg)
+    model = get_model(cfg)
 
     model.to(device)
-    optimizer = optim.Adam(
-        model.parameters(),
-        lr=args.lr,
-        betas=(args.beta1, args.beta2),
-        weight_decay=args.weight_decay,
-    )
+
+    optimizer = get_optimizer(model=model, cfg=cfg)
 
     # Scheduler with Warmup
-    warmup_epochs = 5
-    # Linear warmup during warmup_epochs, then CosineAnnealing
-    warmup_scheduler = optim.lr_scheduler.LinearLR(
-        optimizer, start_factor=0.01, total_iters=warmup_epochs
-    )
-    cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=(args.epochs - warmup_epochs)
-    )
-    # SequentialLR requires pytorch >= 1.10
-    scheduler = optim.lr_scheduler.SequentialLR(
-        optimizer,
-        schedulers=[warmup_scheduler, cosine_scheduler],
-        milestones=[warmup_epochs],
-    )
+    warmup_epochs = cfg.training.warmup_epochs
+
+    if warmup_epochs >= cfg.training.epochs:
+        # If warmup covers the entire training, only use LinearLR
+        scheduler = optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=0.01, total_iters=cfg.training.epochs
+        )
+    else:
+        # Linear warmup during warmup_epochs, then CosineAnnealing
+        warmup_scheduler = optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=0.01, total_iters=warmup_epochs
+        )
+        cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=(cfg.training.epochs - warmup_epochs)
+        )
+        # SequentialLR requires pytorch >= 1.10
+        scheduler = optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, cosine_scheduler],
+            milestones=[warmup_epochs],
+        )
 
     loss_fn = nn.CrossEntropyLoss(label_smoothing=0.1)
     early_stopping = EarlyStopping(
-        patience=args.patience, verbose=True, path=f"{args.checkpoint_dir}/best.pth"
+        patience=cfg.training.patience,
+        verbose=True,
+        path=f"{cfg.training.checkpoint_dir}/best.pth",
     )
 
-    writer = SummaryWriter(log_dir=args.log_dir)
-    for epoch in range(1, args.epochs + 1):
+    writer = SummaryWriter(log_dir=cfg.training.log_dir)
+    for epoch in range(1, cfg.training.epochs + 1):
         train_loss = train_one_epoch(
             model,
             train_dataloader,
@@ -128,7 +179,7 @@ def main():
             loss_fn,
             epoch,
             device,
-            max_grad_norm=args.max_grad_norm,
+            max_grad_norm=cfg.model.max_grad_norm,
         )
         valid_loss, valid_acc = evaluate_one_epoch(
             model, valid_dataloader, loss_fn, epoch, device

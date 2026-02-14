@@ -1,0 +1,11 @@
+name: vit_tiny
+num_heads: 3
+num_blocks: 12
+patch_size: 4
+embed_dim: 192
+ffn_dim: 768
+dropout: 0.1
+max_grad_norm: 1.0
+image_size: ${data.image_size}
+in_channels: ${data.in_channels}
+num_classes: ${data.num_classes}

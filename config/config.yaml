@@ -1,0 +1,17 @@
+defaults:
+  - model: vit_base
+  - data: cifar100
+  - optimizer: adamw
+  - _self_
+
+training:
+  epochs: 20
+  seed: 42
+  log_dir: "runs/transformer"
+  checkpoint_dir: "checkpoint_dir"
+  patience: 5
+  warmup_epochs: 5
+
+hydra:
+  job:
+    chdir: False

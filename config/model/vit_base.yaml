@@ -1,0 +1,13 @@
+name: vit_base
+num_heads: 12
+num_blocks: 12
+patch_size: 4
+embed_dim: 768
+ffn_dim: 3072
+dropout: 0.2
+max_grad_norm: 1.0
+image_size: ${data.image_size}
+in_channels: ${data.in_channels}
+num_classes: ${data.num_classes}
+
+

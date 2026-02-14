@@ -31,34 +31,48 @@ uv sync
 
 ### Training
 
-To start training with the default configuration (ViT-Base like parameters adapted for CIFAR):
+To start training with the default configuration (ViT-Base):
 
 ```bash
 uv run python scripts/train.py
 ```
 
-### Custom Training Arguments
+### Model Selection
 
-You can scale the model size and training parameters using command line arguments:
+We support multiple model sizes via Hydra configuration. You can select a model using the `model` argument:
 
 ```bash
-# Train a smaller model for testing
-uv run python scripts/train.py \
-    --epochs 100 \
-    --batch_size 128 \
-    --embed_dim 192 \
-    --num_heads 3 \
-    --num_blocks 12 \
-    --ffn_dim 768 \
-    --learning_rate 1e-3
+# Tiny (192 dim, 3 heads) - Fast training for debugging
+uv run python scripts/train.py model=vit_tiny
+
+# Small (384 dim, 6 heads)
+uv run python scripts/train.py model=vit_small
+
+# Base (768 dim, 12 heads) - Default
+uv run python scripts/train.py model=vit_base
+
+# Large (1024 dim, 16 heads)
+uv run python scripts/train.py model=vit_large
 ```
 
-Key arguments:
-- `--patch_size`: Size of the patches (default: 4 for 32x32 images)
-- `--embed_dim`: Embedding dimension of the transformer
-- `--num_heads`: Number of attention heads
-- `--num_blocks`: Number of transformer encoder blocks
-- `--patience`: Early stopping patience (default: 5)
+### Custom Training Arguments
+
+You can override any configuration parameter using Hydra syntax:
+
+```bash
+# Train with custom epochs and batch size
+uv run python scripts/train.py \
+    training.epochs=100 \
+    data.batch_size=128 \
+    optimizer.lr=1e-3
+```
+
+Common overrides:
+- `training.epochs`: Number of training epochs
+- `data.batch_size`: Batch size
+- `optimizer.lr`: Learning rate
+- `model.dropout`: Dropout rate
+- `training.patience`: Early stopping patience
 
 ### Monitoring
 
@@ -73,6 +87,11 @@ tensorboard --logdir runs/
 ```
 .
 ├── checkpoint_dir/     # Saved model checkpoints
+├── config/            # Hydra configuration files
+│   ├── config.yaml    # Main configuration
+│   ├── data/
+│   ├── model/         # Model presets (tiny, small, base, large)
+│   └── optimizer/
 ├── data/              # CIFAR-100 dataset (downloaded automatically)
 ├── runs/              # TensorBoard logs
 ├── scripts/

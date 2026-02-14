@@ -1,0 +1,9 @@
+name: CIFAR100
+batch_size: 32
+shuffle: true
+num_workers: 4
+num_classes: 100
+image_size: 32
+in_channels: 3
+normalize_mean: [0.5071, 0.4867, 0.4408]
+normalize_std: [0.2675, 0.2565, 0.2761]

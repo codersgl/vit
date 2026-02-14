@@ -37,7 +37,7 @@ def train_one_epoch(
         count += 1
         progress_bar.set_postfix({"loss": f"{loss.item():.4f}"})
 
-    print(f"[Epoch] Total: {total_loss / count:.4f}")
+    print(f"[Epoch] Total: avg_loss: {total_loss / count:.4f}")
 
     return total_loss / count
 
