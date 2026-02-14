@@ -7,11 +7,12 @@ defaults:
 training:
   epochs: 20
   seed: 42
-  log_dir: "runs/transformer"
-  checkpoint_dir: "checkpoint_dir"
+  log_dir: "tensorboard"
+  checkpoint_dir: "checkpoints"
   patience: 5
   warmup_epochs: 5
+  interactive_save: True
 
 hydra:
   job:
-    chdir: False
+    chdir: True

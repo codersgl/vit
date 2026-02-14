@@ -1,5 +1,6 @@
 #!.venv/bin/python3
 import random
+from pathlib import Path
 from typing import Tuple
 
 import hydra
@@ -27,14 +28,17 @@ def set_seed(seed=42):
 
 def get_dataloader(cfg: DictConfig) -> Tuple[DataLoader, DataLoader]:
     try:
+        data_root = Path(hydra.utils.get_original_cwd()) / "data"
         if cfg.data.name == "CIFAR100":
             train_dataset = CIFAR100ForViT(
+                root=str(data_root),
                 train=True,
                 transform=get_train_transform(
                     mean=cfg.data.normalize_mean, std=cfg.data.normalize_std
                 ),
             )
             valid_dataset = CIFAR100ForViT(
+                root=str(data_root),
                 train=False,
                 transform=get_val_transform(
                     mean=cfg.data.normalize_mean, std=cfg.data.normalize_std
@@ -207,6 +211,22 @@ def main(cfg: DictConfig):
         )
 
     writer.close()
+
+    print(f"Result saved in {Path.cwd()}")
+    if cfg.training.get("interactive_save", True):
+        try:
+            response = input("Save this experiment? (Y/n): ").strip().lower()
+            if response == "n":
+                import shutil
+                import os
+
+                print("Deleting experiment results...")
+                current_dir = Path.cwd()
+                os.chdir(str(current_dir.parent))
+                shutil.rmtree(current_dir)
+                print("Deleted.")
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
 
 
 if __name__ == "__main__":
