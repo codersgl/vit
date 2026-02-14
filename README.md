@@ -68,6 +68,7 @@ uv run python scripts/train.py \
 ```
 
 Common overrides:
+
 - `training.epochs`: Number of training epochs
 - `data.batch_size`: Batch size
 - `optimizer.lr`: Learning rate
@@ -108,12 +109,16 @@ tensorboard --logdir runs/
 ## Implementation Details
 
 ### Initialization
+
 ViT is known to be sensitive to initialization. This implementation uses:
+
 - `nn.init.trunc_normal_` (std=0.02) for Linear and Conv2d weights.
 - `nn.init.constant_` (0) for biases.
 - `nn.init.constant_` (1.0) for LayerNorm weights.
 
 ### Learning Rate Schedule
+
 To ensure stable convergence from scratch:
+
 1. **Warmup**: Linearly increases LR from `1e-5` to `target_lr` over the first 5 epochs.
 2. **Cosine Decay**: Decays LR following a cosine curve for the remaining epochs.
